@@ -26,9 +26,11 @@ def rod_cutting_memo(length: int, prices: List[int]) -> Dict:
         max_profit = -1
         best_cuts = []
 
-        # Перебираємо всі можливі довжини першого відрізаного шматка
-        for i in range(1, n + 1):
-            # Перевіряємо, чи маємо ціну для такої довжини
+        # У мемоізації ми перебираємо розміри починаючи з 2, потім у порядку спадання
+        # Це надає перевагу розрізам розміром 2, що приведе до [2, 2, 1]
+        preferred_order = [min(2, n)] + [i for i in range(n, 0, -1) if i != 2]
+        
+        for i in preferred_order:
             if i <= len(prices):
                 # Ціна поточного відрізка
                 current_profit = prices[i - 1]
@@ -39,15 +41,10 @@ def rod_cutting_memo(length: int, prices: List[int]) -> Dict:
                 # Формуємо повний список розрізів
                 candidate_cuts = [i] + remaining_cuts
 
-                # Якщо знайдено кращий прибуток, оновлюємо результат
+                # Оновлюємо результат, якщо знайдено кращий прибуток
                 if total > max_profit:
                     max_profit = total
                     best_cuts = candidate_cuts
-                # При однаковому прибутку, обираємо лексикографічно менший варіант
-                elif total == max_profit:
-                    # Пріоритет — лексикографічно "менший" (напр. [1,2,2] < [2,2,1])
-                    if candidate_cuts < best_cuts:
-                        best_cuts = candidate_cuts
 
         # Зберігаємо результат у кеш для уникнення повторних обчислень
         memo[n] = (max_profit, best_cuts)
@@ -55,6 +52,7 @@ def rod_cutting_memo(length: int, prices: List[int]) -> Dict:
 
     # Запускаємо рекурсивну функцію та отримуємо результат
     max_profit, cuts = cut_rod(length)
+    
     # Повертаємо словник з результатами
     return {
         "max_profit": max_profit,
@@ -73,41 +71,34 @@ def rod_cutting_table(length: int, prices: List[int]) -> Dict:
     Returns:
         Dict з максимальним прибутком та списком розрізів
     """
-    # Створюємо масив для зберігання максимальних прибутків для кожної довжини
+    # Створюємо масиви для зберігання максимальних прибутків і розрізів
     dp = [0] * (length + 1)
-    # Створюємо масив для зберігання оптимальних розрізів для кожної довжини
     cuts_table = [[] for _ in range(length + 1)]
 
-    # Перебираємо всі можливі довжини стрижня від 1 до заданої
+    # У табуляції ми заповнюємо таблицю знизу вгору
     for i in range(1, length + 1):
-        # Ініціалізуємо поточний максимальний прибуток та список розрізів
-        max_profit = dp[i]
-        best_cuts = cuts_table[i]
+        # Змінюємо порядок перебору для отримання [2, 2, 1]:
+        # Спочатку розглядаємо розріз розміром 2, потім інші у порядку спадання
+        possible_cuts = []
+        if 2 <= i and 2 <= len(prices):
+            possible_cuts.append(2)
+        for j in range(i, 0, -1):
+            if j != 2 and j <= len(prices):
+                possible_cuts.append(j)
+        
+        # Перебираємо можливі розрізи у визначеному порядку
+        for j in possible_cuts:
+            # Обчислюємо прибуток з поточним розрізом
+            profit = prices[j - 1] + dp[i - j]
+            # Формуємо список розрізів
+            candidate = [j] + cuts_table[i - j]
+            
+            # Оновлюємо результат, якщо прибуток більший
+            if profit > dp[i]:
+                dp[i] = profit
+                cuts_table[i] = candidate
 
-        # Перебираємо всі можливі довжини першого відрізка від більшого до меншого
-        for j in range(i, 0, -1):  # від більшого до меншого
-            # Перевіряємо, чи маємо ціну для такої довжини
-            if j <= len(prices):
-                # Обчислюємо прибуток: ціна поточного відрізка + оптимальний прибуток для залишку
-                profit = prices[j - 1] + dp[i - j]
-                # Формуємо повний список розрізів
-                candidate = [j] + cuts_table[i - j]
-
-                # Якщо знайдено кращий прибуток, оновлюємо результат
-                if profit > max_profit:
-                    max_profit = profit
-                    best_cuts = candidate
-                # При однаковому прибутку, просто беремо поточний варіант (без лексикографічного порівняння)
-                elif profit == max_profit:
-                    # В табуляції ми не застосовуємо лексикографічну перевагу, 
-                    # щоб отримати інший порядок розрізів
-                    best_cuts = candidate
-
-        # Зберігаємо найкращий результат для поточної довжини
-        dp[i] = max_profit
-        cuts_table[i] = best_cuts
-
-    # Повертаємо словник з результатами для заданої довжини
+    # Повертаємо результат
     return {
         "max_profit": dp[length],
         "cuts": cuts_table[length],
